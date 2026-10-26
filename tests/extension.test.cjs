@@ -519,3 +519,66 @@ test("mouse-focused rail buttons do not keep either hover card open after leavin
     }
   } finally { env.cleanup(); }
 });
+
+test("right directory chapters collapse independently without navigating, including nested chapters", () => {
+  const env = boot(user("u1", "章节折叠") + answer("a1", "<h1>一、背景</h1><h2>1. 方案</h2><h3>1.1 细节</h3><h1>二、实现</h1><h2>1. 步骤</h2>"));
+  try {
+    env.tocRoot.querySelector(".toc-mark").click();
+    const toggle = (label) => env.tocRoot.querySelector(`.toc-toggle[aria-label="${label}"]`);
+    const group = (button) => env.tocRoot.getElementById(button.getAttribute("aria-controls"));
+    const nested = toggle("收起章节 1. 方案");
+    nested.click();
+    assert.equal(group(nested).hidden, true);
+    const chapter = toggle("收起章节 一、背景");
+    chapter.click();
+    assert.equal(chapter.getAttribute("aria-expanded"), "false");
+    assert.equal(group(chapter).hidden, true);
+    assert.equal(group(toggle("收起章节 二、实现")).hidden, false);
+    assert.equal(env.scrolled.length, 1, "disclosure clicks must not navigate");
+    chapter.click();
+    assert.equal(group(chapter).hidden, false);
+    assert.equal(group(nested).hidden, true, "reopening a parent preserves the child's own collapse state");
+    env.tocRoot.querySelector('.toc-item[aria-label="一、背景"]').click();
+    assert.equal(env.scrolled.at(-1).element.textContent, "一、背景");
+    assert.equal(env.tocRoot.querySelector(".toc-pin").getAttribute("aria-pressed"), "false");
+  } finally { env.cleanup(); }
+});
+
+test("right chapter collapse survives streaming and round switches, then resets for another conversation", async () => {
+  const env = boot();
+  try {
+    const toggle = env.tocRoot.querySelector('.toc-toggle[aria-label="收起章节 2. 消息方案"]');
+    toggle.click();
+    env.document.querySelector('[data-message-id="a2"] .markdown').insertAdjacentHTML("beforeend", "<h3>2.3 流式新增</h3>");
+    await pause();
+    const added = env.tocRoot.querySelector('.toc-item[aria-label="2.3 流式新增"]');
+    assert.equal(added.closest(".toc-children").hidden, true);
+    env.root.querySelector('.rail-turn[data-turn-key="u1"]').click();
+    env.root.querySelector('.rail-turn[data-turn-key="u2"]').click();
+    assert.ok(env.tocRoot.querySelector('.toc-toggle[aria-label="展开章节 2. 消息方案"]'));
+    assert.equal(env.tocRoot.querySelector('.toc-item[aria-label="2.1 消费幂等"]').closest(".toc-children").hidden, true);
+    env.window.history.pushState({}, "", "/c/other-conversation");
+    env.document.querySelector("main").innerHTML = env.document.querySelector("main").innerHTML;
+    await pause();
+    assert.ok(env.tocRoot.querySelector('.toc-toggle[aria-label="收起章节 2. 消息方案"]'));
+  } finally { env.cleanup(); }
+});
+
+test("scrolling within a collapsed chapter highlights its visible parent, while explicit jumps reveal the target", async () => {
+  const env = boot();
+  try {
+    env.tocRoot.querySelector('.toc-mark[aria-label="定位小节 2.1 消费幂等"]').click();
+    const toggle = env.tocRoot.querySelector('.toc-toggle[aria-label="收起章节 2. 消息方案"]');
+    toggle.click();
+    const parent = env.tocRoot.querySelector('.toc-item[aria-label="2. 消息方案"]');
+    assert.equal(parent.classList.contains("contains-active"), true);
+    env.document.dispatchEvent(new env.window.Event("scroll"));
+    await pause(30);
+    assert.equal(toggle.getAttribute("aria-expanded"), "false", "scrollspy must respect manual collapse");
+    env.tocRoot.querySelector('.toc-mark[aria-label="定位小节 2.2 对账与重试"]').click();
+    assert.equal(toggle.getAttribute("aria-expanded"), "true");
+    assert.equal(parent.classList.contains("contains-active"), false);
+    assert.equal(env.scrolled.at(-1).element.textContent, "2.2 对账与重试");
+    assert.equal(env.tocRoot.querySelector('.toc-item[aria-label="2.2 对账与重试"]').classList.contains("active"), true);
+  } finally { env.cleanup(); }
+});

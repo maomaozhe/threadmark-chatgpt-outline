@@ -104,6 +104,7 @@
     navigationUntil = Date.now() + 1100;
     panel.setActive(turn.key, section?.id || "");
     tocPanel.setActive(turn.key, section?.id || "");
+    if (section) tocPanel.expandTo(section.id);
     clearHighlight();
     target.setAttribute("data-threadmark-focus", "true");
     highlight = target;

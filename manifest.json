@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT 对话目录 · Threadmark",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "左侧按轮次定位，右侧展开当前轮次的小节目录；颜色跟随系统，所有处理均在本地完成。",
   "minimum_chrome_version": "109",
   "permissions": ["storage"],
