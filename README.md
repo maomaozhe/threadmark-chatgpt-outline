@@ -4,7 +4,13 @@
 
 Threadmark 是一个无需编译的 Chrome / Edge Manifest V3 扩展：**左侧定位对话轮次，右侧展开当前轮次的小节目录**。使用原生 JavaScript，不需要 API Key。
 
-> 0.3.1 默认显示等长短线，悬停展开详情，移开自动收起。真实 ChatGPT 网页截图正在补充；离线交互可打开 `preview/index.html` 体验。
+![真实 ChatGPT 网页：当前轮次的小节目录与跳转](docs/demo.jpg)
+
+![真实 ChatGPT 网页：默认等长短线](docs/demo-default.jpg)
+
+![真实 ChatGPT 网页：展开小节与切换轮次](docs/demo.gif)
+
+> 演示来自 chatgpt.com 的真实历史会话，使用 0.3.1 扩展。左侧账号栏已裁去。
 
 ## 安装
 
