@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Threadmark · 对话目录交互演示</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+  <aside class="workspace-nav">
+    <a class="workspace-name" href="#"><span class="workspace-mark">◎</span> ChatGPT <span class="muted">↗</span></a>
+    <div class="nav-action"><span>＋</span> 新对话</div>
+    <div class="nav-action"><span>⌕</span> 搜索对话</div>
+    <div class="nav-label">学习空间</div>
+    <div class="nav-action chosen">分布式事务，逐层理解</div>
+    <div class="nav-action secondary">Java 并发知识梳理</div>
+    <div class="nav-action secondary">从零理解消息队列</div>
+    <div class="nav-action secondary">系统设计练习</div>
+    <div class="nav-bottom"><span class="avatar">M</span><span>我的工作空间<small>Threadmark 交互演示</small></span></div>
+  </aside>
+  <div class="page">
+    <header class="page-header"><span>分布式事务，逐层理解 <span class="header-chevron">⌄</span></span><span class="demo-label">交互演示 · 模拟内容</span></header>
+    <main>
+      <div class="conversation">
+        <div class="demo-intro"><span class="eyebrow">A PLACE FOR EVERY THOUGHT</span><h1>长对话，也能有章可循。</h1><p>左侧定位对话轮次，右侧展开当前回答的小节目录。</p></div>
+        <article><div data-message-author-role="user" data-message-id="u1"><div class="question">想系统理解分布式事务，先帮我建立整体认知。</div></div></article>
+        <article><div data-message-author-role="assistant" data-message-id="a1"><div class="markdown">
+          <p>我们先从一个问题开始：当一次业务操作跨越多个服务，怎样让结果保持一致？</p>
+          <h2>1. 分布式事务的整体认知</h2><p>在单个数据库里，本地事务负责维护原子性。业务拆成订单、库存、账户等服务后，一次购买就涉及多个独立的数据源。</p>
+          <h3>1.1 为什么本地事务不够用？</h3><p>订单创建成功，而库存扣减失败。每个服务的本地操作都可以是正确的，但业务整体仍然可能不一致。我们需要明确跨服务操作的完成与补偿规则。</p>
+          <div class="callout"><strong>先记住一个核心问题</strong><p>每一步分别成功，不代表整件事最终成功。</p></div>
+          <h3>1.2 一致性、可用性与业务取舍</h3><p>先问业务允许多久的不一致，再选择协调方案。支付确认与消息提醒的一致性要求往往不同，统一使用最重的方案通常代价很高。</p>
+          <h2>2. 从业务边界选择方案</h2><h3>2.1 先画清楚一次业务操作</h3><p>列出参与服务、数据源、关键状态和可逆操作。找到真正需要一起完成的动作，再决定在哪一层协调它们。</p>
+        </div></div></article>
+        <div class="turn-divider"><span>继续深入</span></div>
+        <article><div data-message-author-role="user" data-message-id="u2"><div class="question">结合电商下单，对比一下 2PC、TCC 和 Saga。</div></div></article>
+        <article><div data-message-author-role="assistant" data-message-id="a2"><div class="markdown">
+          <p>还是用“创建订单 → 扣减库存 → 扣款”这条链路。三种方案的差别，在于如何协调提交，以及失败后如何恢复。</p>
+          <h2>1. 两阶段提交：2PC</h2><h3>1.1 Prepare：先询问能否提交</h3><p>协调者询问各个参与者是否准备就绪。参与者执行本地操作并保留必要资源，向协调者返回准备结果。</p>
+          <h3>1.2 Commit：再统一作出决定</h3><p>协调者收集所有响应后决定提交或回滚。准备阶段占用的资源、协调者故障和网络异常，是需要理解的工程代价。</p>
+          <h2>2. TCC：在业务层预留资源</h2><h3>2.1 Try、Confirm 与 Cancel</h3><p>库存服务先冻结库存，再根据业务结果确认扣减或取消冻结。它要求业务自己定义预留、确认和取消的行为。</p>
+          <h3>2.2 幂等与空回滚</h3><p>重试可能让确认与取消重复到达，所以每一步都需要幂等。取消比预留先到达时，也必须有清晰的处理规则。</p>
+          <h2>3. Saga：用补偿推进长流程</h2><h3>3.1 将业务拆成本地事务序列</h3><p>每个步骤独立提交，并提供补偿动作。流程失败时按业务规则执行补偿，逐步恢复到可接受的状态。</p>
+          <h3>3.2 补偿不等于时间倒流</h3><p>已经发送的邮件无法撤回，已经发生的操作也未必完全可逆。补偿是新的业务动作，需要明确边界与失败处理。</p>
+          <table><thead><tr><th>方案</th><th>协调方式</th><th>业务改造</th></tr></thead><tbody><tr><td>2PC</td><td>数据库资源协调</td><td>依赖参与者支持</td></tr><tr><td>TCC</td><td>预留与确认</td><td>定义三类业务接口</td></tr><tr><td>Saga</td><td>提交与补偿</td><td>定义补偿流程</td></tr></tbody></table>
+        </div></div></article>
+        <div class="turn-divider"><span>落到具体实现</span></div>
+        <article><div data-message-author-role="user" data-message-id="u3"><div class="question">如果用消息队列实现最终一致性，应该怎么落地？</div></div></article>
+        <article><div data-message-author-role="assistant" data-message-id="a3"><div class="markdown">
+          <p>可以从“本地消息表 + 可靠投递 + 消费幂等”开始。把难以跨服务原子提交的问题，转成可追踪、可重试的流程。</p>
+          <h2>1. 本地消息表模式</h2><h3>1.1 在同一个事务中写订单和事件</h3><p>订单记录和待发送的事件写入同一个数据库事务。这样只要订单成功，事件就有持久化记录，不会凭空丢失。</p>
+          <pre><code>BEGIN;
+  INSERT INTO orders (...);
+  INSERT INTO outbox_events (...);
+COMMIT;</code></pre>
+          <h3>1.2 异步投递与失败重试</h3><p>后台任务读取待发送事件并投递到消息队列。发送成功后更新状态。网络超时时结果可能不确定，因此要允许安全重试。</p>
+          <h2>2. 消费端的可靠处理</h2><h3>2.1 通过业务唯一键保证幂等</h3><p>给事件稳定的业务唯一键，在消费端用唯一约束或处理记录防止重复扣减。重复投递是正常情况，要把它作为设计前提。</p>
+          <h3>2.2 对账、告警与人工兜底</h3><p>记录失败次数、最后错误和等待时长。对长时间未完成的事件告警，并提供查询、对账和人工处理入口。</p>
+          <div class="callout"><strong>一个实用的检查顺序</strong><p>能否发现失败 → 能否安全重试 → 能否确认完成 → 能否人工处理。</p></div>
+          <h2>3. 实施清单</h2><p><strong>3.1 先验证最小闭环</strong></p><p>从一条完整链路开始，模拟投递失败、重复消费和消费者重启，再逐步扩展到更多业务。</p>
+          <p><strong>3.2 再补齐可观测性</strong></p><p>让每个事件都有可查询的状态、重试记录和关联订单，方便定位卡在哪一步。</p>
+        </div></div></article>
+        <div id="new-turns"></div>
+        <div class="demo-actions"><button id="add-turn">＋ 模拟新一轮回答</button><button id="stream-answer">↻ 模拟流式补充小节</button><p>这两个按钮用于验证目录会随对话自动更新。</p></div>
+      </div>
+    </main>
+    <footer class="composer"><div>继续这段对话…<span>↑</span></div><small>此页面只演示扩展交互，不会发送消息。</small></footer>
+  </div>
+  <script src="../src/core.js"></script><script src="../src/styles.js"></script><script src="../src/panel.js"></script><script src="../src/section-panel.js"></script><script src="../src/content.js"></script><script src="preview.js"></script>
+</body>
+</html>

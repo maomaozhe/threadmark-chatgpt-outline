@@ -1,0 +1,9 @@
+node_modules/
+npm-debug.log*
+dist/
+work/
+__pycache__/
+.DS_Store
+Thumbs.db
+.env
+.env.*

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT 对话目录 · Threadmark",
+  "version": "0.3.0",
+  "description": "左侧按轮次定位，右侧展开当前轮次的小节目录；颜色跟随系统，所有处理均在本地完成。",
+  "minimum_chrome_version": "109",
+  "permissions": ["storage"],
+  "icons": {"16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "action": {
+    "default_title": "显示 / 收起对话目录",
+    "default_icon": {"16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png"}
+  },
+  "background": {"service_worker": "background.js"},
+  "commands": {
+    "toggle-outline": {
+      "suggested_key": {"default": "Alt+Shift+O"},
+      "description": "显示或收起 ChatGPT 对话目录"
+    }
+  },
+  "content_scripts": [{
+    "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+    "js": ["src/core.js", "src/styles.js", "src/panel.js", "src/section-panel.js", "src/content.js"],
+    "run_at": "document_idle"
+  }]
+}
