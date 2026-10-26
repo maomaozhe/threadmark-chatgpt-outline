@@ -11,10 +11,9 @@ svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.5;
 .toc-rail { position:fixed; right:12px; top:50%; transform:translateY(-50%); width:40px; max-height:64vh; padding:8px 0; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; overscroll-behavior:contain; z-index:2147483500; }
 .toc-rail::-webkit-scrollbar { display:none; }
 .toc-mark { width:40px; height:17px; min-height:17px; padding:0 4px; display:flex; justify-content:flex-end; align-items:center; }
-.toc-line { width:22px; height:2px; border-radius:1px; background:var(--toc-line); transition:width .15s,background .15s; flex-shrink:0; }
-.toc-mark[data-depth="child"] .toc-line { width:12px; }
-.toc-mark:hover .toc-line,.toc-mark:focus-visible .toc-line { background:var(--toc-active); }
-.toc-mark.active .toc-line { width:28px; background:var(--toc-active); }
+.toc-line { width:16px; height:2px; border-radius:1px; background:var(--toc-line); transition:width .15s,background .15s; flex-shrink:0; }
+.toc-mark:hover .toc-line,.toc-mark:focus-visible .toc-line { width:24px; background:var(--toc-active); }
+.toc-mark.active .toc-line { background:var(--toc-active); }
 .toc-mark:focus-visible { outline-offset:-2px; }
 .toc-card { position:fixed; right:56px; top:var(--toc-top); width:280px; max-width:calc(100vw - 76px); max-height:calc(100vh - var(--toc-top) - 20px); display:flex; flex-direction:column; color:var(--toc-text); background:var(--toc-surface); border:1px solid var(--toc-border); border-radius:13px; box-shadow:0 6px 24px #00000012; overflow:hidden; z-index:2147483501; }
 .toc-head { display:flex; align-items:center; gap:6px; padding:10px 10px 0 16px; min-height:34px; color:var(--toc-muted); }
@@ -237,7 +236,7 @@ svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.5;
       clearTimeout(this.closeTimer);
       if (this.pinned) return;
       this.closeTimer = setTimeout(() => {
-        if (!this.pinned && !this.root.activeElement && !this.card.matches(":hover") && !this.rail.matches(":hover")) this.setOpen(false);
+        if (!this.pinned && !this.root.activeElement?.matches(":focus-visible") && !this.card.matches(":hover") && !this.rail.matches(":hover")) this.setOpen(false);
       }, 220);
     }
 

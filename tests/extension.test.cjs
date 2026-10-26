@@ -283,16 +283,18 @@ test("the initial UI is a compact rail and hover previews a round without naviga
   } finally { env.cleanup(); }
 });
 
-test("clicking a rail marker pins its directory and navigates to that question", () => {
+test("clicking a rail marker navigates without pinning, and explicit pinning protects the preview", () => {
   const env = boot();
   try {
     env.root.querySelector('.rail-turn[data-turn-key="u1"]').click();
     assert.equal(env.root.querySelector(".directory").hidden, false);
-    assert.equal(env.root.querySelector(".pin").getAttribute("aria-pressed"), "true");
+    assert.equal(env.root.querySelector(".pin").getAttribute("aria-pressed"), "false");
     assert.equal(env.scrolled.at(-1).element.getAttribute("data-message-id"), "u1");
     const displayed = [...env.root.querySelectorAll(".turn")].filter((node) => !node.hidden);
     assert.equal(displayed.length, 1);
     assert.equal(displayed[0].dataset.turnKey, "u1");
+    env.root.querySelector(".pin").click();
+    assert.equal(env.root.querySelector(".pin").getAttribute("aria-pressed"), "true");
     env.root.querySelector('.rail-turn[data-turn-key="u2"]').dispatchEvent(new env.window.MouseEvent("mouseenter"));
     assert.equal(env.root.querySelector(".preview-title").textContent, "认识分布式事务", "hover must not replace a pinned card");
     env.root.querySelector('.rail-turn[data-turn-key="u2"]').click();
@@ -404,7 +406,7 @@ test("pinning the right directory follows round changes and closing restores the
     assert.equal(main.getAttribute("style"), null);
     assert.equal(env.root.querySelector(".panel").hidden, false, "left card stays open");
     assert.equal(env.tocRoot.querySelectorAll(".toc-mark").length, 2);
-    assert.deepEqual(JSON.parse(JSON.stringify(env.writes.at(-1))), { "threadmark:preferences": { open: true, tocPinned: false } });
+    assert.deepEqual(JSON.parse(JSON.stringify(env.writes.at(-1))), { "threadmark:preferences": { open: false, tocPinned: false } });
   } finally { env.cleanup(); }
 });
 
@@ -495,4 +497,25 @@ test("section hierarchy respects semantic chapter levels and numbered sublevels"
   const env = create(user("u1", "章节") + answer("a1", "<h1>一、背景</h1><h2>1. 方案</h2><h2>1.1 小节</h2><h2>2. 另一方案</h2><h1>二、实现</h1><h2>1. 实施</h2>"));
   try { assert.deepEqual(Core.readConversation(env.document)[0].sections.map((section) => section.depth), [0, 1, 2, 1, 0, 1]); }
   finally { env.cleanup(); }
+});
+
+test("mouse-focused rail buttons do not keep either hover card open after leaving", async () => {
+  const env = boot();
+  try {
+    for (const [root, marker, rail, card] of [
+      [env.root, ".rail-turn", ".rail", ".panel"],
+      [env.tocRoot, ".toc-mark", ".toc-rail", ".toc-card"]
+    ]) {
+      const button = root.querySelector(marker);
+      button.click();
+      button.focus();
+      // jsdom lacks input modality: model the browser's pointer-only focus state.
+      const matches = button.matches.bind(button);
+      button.matches = (selector) => selector === ":focus-visible" ? false : matches(selector);
+      root.querySelector(rail).dispatchEvent(new env.window.MouseEvent("mouseleave"));
+      await pause(280);
+      assert.equal(root.querySelector(card).hidden, true);
+      button.blur();
+    }
+  } finally { env.cleanup(); }
 });

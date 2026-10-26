@@ -70,7 +70,6 @@
       this.root.querySelector(".directory-toggle").addEventListener("click", () => {
         this.directoryOpen = !this.directoryOpen;
         if (this.previewKey) this.expanded.add(this.previewKey);
-        this.pinned = true;
         this.render();
         this.updatePin();
       });
@@ -143,7 +142,7 @@
     scheduleClose() {
       clearTimeout(this.closeTimer);
       if (!this.pinned) this.closeTimer = setTimeout(() => {
-        if (!this.pinned && !this.root.activeElement && !this.root.querySelector(".panel").matches(":hover") && !this.rail.matches(":hover")) this.setOpen(false);
+        if (!this.pinned && !this.root.activeElement?.matches(":focus-visible") && !this.root.querySelector(".panel").matches(":hover") && !this.rail.matches(":hover")) this.setOpen(false);
       }, 220);
     }
 
@@ -153,10 +152,10 @@
       this.host.style.setProperty("--card-top", `${Math.max(16, Math.min(anchor - 16, innerHeight - 430))}px`);
     }
 
-    showTurn(turn, pinned = false) {
-      if (this.pinned && !pinned && this.previewKey !== turn.key) return;
+    showTurn(turn, selected = false) {
+      if (this.pinned && !selected && this.previewKey !== turn.key) return;
       this.previewKey = turn.key;
-      this.setOpen(true, pinned);
+      this.setOpen(true);
       this.render();
     }
 
@@ -169,7 +168,6 @@
         button.setAttribute("aria-label", `定位第 ${turn.number} 轮：${turn.title}`);
         button.setAttribute("aria-haspopup", "dialog");
         const line = element("span", "rail-line");
-        line.style.setProperty("--line-width", `${10 + Math.min(16, Math.round(turn.title.length / 4))}px`);
         button.append(line);
         button.addEventListener("mouseenter", () => this.showTurn(turn));
         button.addEventListener("focus", () => { if (!this.ignoreFocus) this.showTurn(turn); });

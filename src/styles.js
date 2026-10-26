@@ -10,9 +10,9 @@ svg { width:17px; height:17px; flex-shrink:0; fill:none; stroke:currentColor; st
 .rail { position:fixed; left:var(--rail-left); top:50%; transform:translateY(-50%); width:42px; max-height:64vh; overflow:auto; scrollbar-width:none; display:flex; flex-direction:column; align-items:flex-start; z-index:2147483500; padding:8px 0; overscroll-behavior:contain; }
 .rail::-webkit-scrollbar { display:none; }
 .rail-turn { display:flex; align-items:center; justify-content:flex-start; width:42px; min-height:14px; height:14px; flex-shrink:0; padding:0 10px 0 4px; border-radius:3px; }
-.rail-line { height:2px; width:var(--line-width,16px); border-radius:1px; background:var(--line); transition:width .15s,background .15s; pointer-events:none; }
-.rail-turn:hover .rail-line,.rail-turn:focus-visible .rail-line { width:30px; background:var(--text); }
-.rail-turn.active .rail-line { width:32px; background:var(--line-active); }
+.rail-line { height:2px; width:16px; border-radius:1px; background:var(--line); transition:width .15s,background .15s; pointer-events:none; }
+.rail-turn:hover .rail-line,.rail-turn:focus-visible .rail-line { width:24px; background:var(--text); }
+.rail-turn.active .rail-line { background:var(--line-active); }
 .rail-turn:focus-visible { outline:0; }
 .rail-turn:focus-visible .rail-line { height:3px; }
 .rail-turn.previewed:not(.active) .rail-line { background:var(--muted); }

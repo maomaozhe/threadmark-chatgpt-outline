@@ -1,6 +1,6 @@
 {
   "name": "threadmark-chatgpt-outline",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Local conversation and section navigation for the ChatGPT website",
   "license": "MIT",
