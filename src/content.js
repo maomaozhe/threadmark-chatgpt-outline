@@ -10,6 +10,7 @@
   let signature = "";
   let scanTimer;
   let scanStarted = 0;
+  let lastScanAt = 0;
   let scrollFrame = 0;
   let navigationUntil = 0;
   let highlight;
@@ -45,6 +46,14 @@
   layoutStyle.textContent = `[data-threadmark-focus="true"] { scroll-margin-top:100px !important; outline:2px solid #999 !important; outline-offset:6px !important; border-radius:4px; } @media(min-width:1200px) { main[data-threadmark-toc-pinned="true"] { margin-inline-end:308px !important; min-width:0 !important; } } @media(prefers-color-scheme:dark) { [data-threadmark-focus="true"] { outline-color:#aaa !important; } } @media print { main[data-threadmark-toc-pinned] { margin-inline-end:0 !important; } }`;
   document.head.append(layoutStyle);
 
+  function ensureMounted() {
+    if (!document.body) return false;
+    if (!panel.host.isConnected) document.body.append(panel.host);
+    if (!tocPanel.host.isConnected) document.body.append(tocPanel.host);
+    if (!layoutStyle.isConnected && document.head) document.head.append(layoutStyle);
+    return true;
+  }
+
   function positionOverlay() {
     const left = document.querySelector("main")?.getBoundingClientRect().left || 0;
     const railLeft = Math.max(8, Math.min(window.innerWidth - 80, left + 10));
@@ -63,6 +72,7 @@
     if (disposed) return;
     scanStarted = 0;
     clearTimeout(scanTimer);
+    if (!ensureMounted()) return;
     if (location.pathname !== path) {
       path = location.pathname;
       pendingReset = true;
@@ -71,7 +81,8 @@
       clearHighlight();
     }
     const next = Core.readConversation(document);
-    const nextSignature = JSON.stringify(next.map((turn) => [turn.key, turn.title, turn.excerpt, turn.answers.length, turn.sections.map((section) => section.label)]));
+    lastScanAt = Date.now();
+    const nextSignature = JSON.stringify(next.map((turn) => [turn.key, turn.title, turn.excerpt, turn.answers.length, turn.sections.map((section) => [section.id, section.label, section.depth, section.parentId])]));
     turns = next; // Refresh DOM references even when visible labels remain unchanged.
     if (force || pendingReset || nextSignature !== signature) {
       signature = nextSignature;
@@ -151,16 +162,22 @@
   const observer = new MutationObserver((mutations) => {
     if (mutations.some((mutation) => mutation.target !== panel.host && !panel.host.contains(mutation.target) && mutation.target !== tocPanel.host && !tocPanel.host.contains(mutation.target) && mutation.target !== layoutStyle && !layoutStyle.contains(mutation.target))) scheduleScan();
   });
-  observer.observe(document.body, {
+  // The application can replace body/head during client navigation. Observe the
+  // document so that replacing the original container cannot strand the watcher.
+  observer.observe(document, {
     childList: true,
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ["hidden", "aria-hidden", "class", "style", "data-message-author-role", "data-chatgpt-search-unit-key", "data-message-id"]
+    attributeFilter: ["hidden", "aria-hidden", "class", "style", "data-message-author-role", "data-chatgpt-search-unit-key", "data-message-id", "data-conversation-role", "data-chatgpt-search-message-ids", "data-message-content"]
   });
   document.addEventListener("scroll", onScroll, { capture: true, passive: true });
   const onPopState = () => scheduleScan();
   window.addEventListener("popstate", onPopState);
+  const onResume = () => { if (!document.hidden) scheduleScan(); };
+  window.addEventListener("focus", onResume);
+  window.addEventListener("pageshow", onResume);
+  document.addEventListener("visibilitychange", onResume);
   const onKey = (event) => {
     // Demo fallback; the packaged extension handles the shortcut through chrome.commands.
     if (!globalThis.chrome?.runtime?.id && event.altKey && event.shiftKey && event.code === "KeyO") {
@@ -173,9 +190,10 @@
   const onOutside = (event) => { if (!panel.pinned && !event.composedPath().includes(panel.host)) panel.setOpen(false); };
   document.addEventListener("pointerdown", onOutside);
   const interval = setInterval(() => {
-    if (location.pathname !== path) scan();
-    if (!panel.host.isConnected) { document.body.append(panel.host); positionOverlay(); }
-    if (!tocPanel.host.isConnected) document.body.append(tocPanel.host);
+    if (document.hidden) return;
+    // A bounded fallback also catches visibility/CSS changes with no observed
+    // mutation. Frequent streaming scans already postpone this idle check.
+    if (location.pathname !== path || !panel.host.isConnected || !tocPanel.host.isConnected || !layoutStyle.isConnected || Date.now() - lastScanAt >= 4000) scan();
   }, 1200);
 
   const onMessage = (message, sender, respond) => {
@@ -197,6 +215,9 @@
     document.removeEventListener("pointerdown", onOutside);
     window.removeEventListener("resize", onResize);
     window.removeEventListener("popstate", onPopState);
+    window.removeEventListener("focus", onResume);
+    window.removeEventListener("pageshow", onResume);
+    document.removeEventListener("visibilitychange", onResume);
     disposers.forEach((dispose) => dispose());
     document.querySelectorAll("main[data-threadmark-toc-pinned]").forEach((main) => main.removeAttribute("data-threadmark-toc-pinned"));
     tocPanel.destroy();

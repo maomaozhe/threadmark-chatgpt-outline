@@ -23,6 +23,7 @@ function create(content, options = {}) {
     runtime: { id: "our-extension", onMessage: { addListener: (listener) => listeners.add(listener), removeListener: (listener) => listeners.delete(listener) } },
     storage: { local: { get: async () => options.saved || {}, set: async (data) => writes.push(data) } }
   };
+  options.setup?.(window);
   return { dom, window, document: window.document, scrolled, writes, listeners, cleanup() { window.dispatchEvent(new window.Event("pagehide")); window.close(); } };
 }
 
@@ -580,5 +581,139 @@ test("scrolling within a collapsed chapter highlights its visible parent, while 
     assert.equal(parent.classList.contains("contains-active"), false);
     assert.equal(env.scrolled.at(-1).element.textContent, "2.2 对账与重试");
     assert.equal(env.tocRoot.querySelector('.toc-item[aria-label="2.2 对账与重试"]').classList.contains("active"), true);
+  } finally { env.cleanup(); }
+});
+
+test("replacing the page body on the same URL remounts and refreshes both outlines", async () => {
+  const env = boot();
+  try {
+    await pause();
+    const body = env.document.createElement("body");
+    body.innerHTML = `<main>${user("new-u", "局部重建后的问题")}${answer("new-a", "<h2>1. 新目录</h2>")}</main>`;
+    env.document.body.replaceWith(body);
+    await pause();
+    assert.equal(env.document.getElementById("threadmark-outline")?.shadowRoot, env.root);
+    assert.equal(env.document.getElementById("threadmark-section-outline")?.shadowRoot, env.tocRoot);
+    assert.equal(env.root.querySelectorAll(".turn").length, 1);
+    assert.equal(env.tocRoot.querySelector(".toc-title").textContent, "局部重建后的问题");
+    assert.equal(env.tocRoot.querySelector(".toc-item").getAttribute("aria-label"), "1. 新目录");
+    env.document.querySelector("main").insertAdjacentHTML("beforeend", user("u-next", "后续问题"));
+    await pause();
+    assert.equal(env.root.querySelectorAll(".turn").length, 2, "observation must continue on the replacement body");
+  } finally { env.cleanup(); }
+});
+
+test("late speaker attributes automatically index an already rendered conversation", async () => {
+  const env = boot('<div data-chatgpt-search-unit-key="pending-user"><span id="user-role">You said:</span><p>延后标记的问题</p></div><div data-chatgpt-search-unit-key="pending-answer"><h4 id="answer-role">ChatGPT said:</h4><h2>1. 延后识别</h2></div>');
+  try {
+    await pause();
+    assert.equal(env.root.querySelectorAll(".turn").length, 0);
+    env.document.getElementById("user-role").setAttribute("data-conversation-role", "user");
+    env.document.getElementById("answer-role").setAttribute("data-conversation-role", "assistant");
+    await pause();
+    assert.equal(env.root.querySelectorAll(".turn").length, 1);
+    assert.equal(env.tocRoot.querySelector(".toc-title").textContent, "延后标记的问题");
+    assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 1);
+  } finally { env.cleanup(); }
+});
+
+test("a visible-page fallback catches visibility changes outside the mutation filter", async () => {
+  const ticks = [];
+  let now = 10000;
+  const env = boot('<style>[data-lazy="pending"] { display:none; }</style>' + user("u1", "延迟显示") + '<div data-lazy="pending">' + answer("a1", "<h2>1. 已加载的目录</h2>") + '</div>', { setup(window) {
+    window.Date.now = () => now;
+    window.setInterval = (callback) => { ticks.push(callback); return 1000; };
+  } });
+  try {
+    await pause();
+    assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 0);
+    env.document.querySelector("[data-lazy]").setAttribute("data-lazy", "ready");
+    await pause();
+    assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 0, "this attribute intentionally has no observer trigger");
+    now += 6000;
+    ticks.forEach((tick) => tick());
+    assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 1);
+  } finally { env.cleanup(); }
+});
+
+test("returning to the page refreshes a missed update without a reload", async () => {
+  for (const eventName of ["focus", "pageshow", "visibilitychange"]) {
+    const env = boot('<style>[data-lazy="pending"] { display:none; }</style>' + user("u1", "恢复页面") + '<div data-lazy="pending">' + answer("a1", "<h2>1. 恢复后的目录</h2>") + '</div>');
+    try {
+      await pause();
+      env.document.querySelector("[data-lazy]").setAttribute("data-lazy", "ready");
+      const target = eventName === "visibilitychange" ? env.document : env.window;
+      target.dispatchEvent(new env.window.Event(eventName));
+      await pause();
+      assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 1, eventName);
+    } finally { env.cleanup(); }
+  }
+});
+
+test("replacing head restores the extension's page stylesheet without duplicating it", async () => {
+  const env = boot();
+  try {
+    await pause();
+    const style = env.document.getElementById("threadmark-page-style");
+    const head = env.document.createElement("head");
+    env.document.head.replaceWith(head);
+    await pause();
+    assert.equal(head.querySelector("#threadmark-page-style"), style);
+    assert.equal(env.document.querySelectorAll("#threadmark-page-style").length, 1);
+  } finally { env.cleanup(); }
+});
+
+test("fallback scans are throttled and suspended in a background tab", async () => {
+  const ticks = [];
+  let now = 10000;
+  const env = boot(fixture(), { setup(window) {
+    window.Date.now = () => now;
+    window.setInterval = (callback) => { ticks.push(callback); return 1000; };
+  } });
+  try {
+    await pause();
+    let reads = 0;
+    const read = env.window.ThreadmarkCore.readConversation;
+    env.window.ThreadmarkCore.readConversation = (...args) => { reads += 1; return read(...args); };
+    for (let i = 0; i < 3; i++) { now += 1200; ticks.forEach((tick) => tick()); }
+    assert.equal(reads, 0, "idle checks must not scan the full page on every tick");
+    now += 1200;
+    ticks.forEach((tick) => tick());
+    assert.equal(reads, 1);
+    Object.defineProperty(env.document, "hidden", { configurable: true, value: true });
+    now += 6000;
+    ticks.forEach((tick) => tick());
+    assert.equal(reads, 1, "background checks must stay idle");
+    Object.defineProperty(env.document, "hidden", { configurable: true, value: false });
+    env.document.dispatchEvent(new env.window.Event("visibilitychange"));
+    await pause();
+    assert.equal(reads, 2, "becoming visible must promptly recover missed updates");
+  } finally { env.cleanup(); }
+});
+
+test("switching histories before cached content becomes visible recovers the new outline without reloading", async () => {
+  const ticks = [];
+  let now = 10000;
+  const env = boot('<style>[data-view="hidden"] { display:none; }</style><section id="old-history" data-view="visible">' + fixture() + '</section><section id="new-history" data-view="hidden">' + user("new-u", "另一条历史会话") + answer("new-a", "<h2>1. 新会话内容</h2><h3>1.1 新会话小节</h3>") + '</section>', { setup(window) {
+    window.Date.now = () => now;
+    window.setInterval = (callback) => { ticks.push(callback); return 1000; };
+  } });
+  try {
+    await pause();
+    const search = env.root.querySelector(".search-input");
+    search.value = "幂等";
+    search.dispatchEvent(new env.window.Event("input"));
+    env.window.history.pushState({}, "", "/c/cached-history");
+    ticks.forEach((tick) => tick());
+    assert.equal(search.value, "", "the route change must reset the old conversation's search");
+    env.document.getElementById("old-history").setAttribute("data-view", "hidden");
+    env.document.getElementById("new-history").setAttribute("data-view", "visible");
+    await pause();
+    now += 6000;
+    ticks.forEach((tick) => tick());
+    assert.equal(env.root.querySelectorAll(".turn").length, 1);
+    assert.equal(env.tocRoot.querySelector(".toc-title").textContent, "另一条历史会话");
+    assert.equal(env.tocRoot.querySelectorAll(".toc-item").length, 2);
+    assert.ok(!env.tocRoot.querySelector(".toc-list").textContent.includes("幂等"));
   } finally { env.cleanup(); }
 });
